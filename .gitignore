@@ -1,4 +1,6 @@
+# Private credentials
 .env*
-PassendorfBudget.db
+
+# Data files
 *.csv
 *.db
