@@ -52,9 +52,9 @@ class USSchools(SchoolsDataSet):
             "EFFECTIVE_DATE": "EffectiveDate",
             "SCH_TYPE_TEXT": "SchoolTypeText",
             "SCH_TYPE": "SchoolType",
-            "RECON_STATUS": "ReconStatus",
+            "RECON_STATUS": "Reconstituted",
             "OUT_OF_STATE_FLAG": "OutOfState",
-            "CHARTER_TEXT": "CharterText",
+            "CHARTER_TEXT": "Charter",
             "CHARTAUTH1": "CharterAuthorizer1",
             "CHARTAUTHN1": "ChartherAuthorizerN1",
             "CHARTAUTH2": "CharterAuthorizer2",
@@ -105,9 +105,23 @@ class USSchools(SchoolsDataSet):
         self.us_schools_df.drop(columns=["StateName", "FIPST"], inplace=True)
 
         # Reorder Columns
-        cols_to_move = ["SchoolID", "SchoolYear"]
+        cols_to_move = ["SchoolID", "SchoolYear", "StateID"]
         other_cols = [c for c in self.us_schools_df.columns if c not in cols_to_move]
         self.us_schools_df = self.us_schools_df[cols_to_move + other_cols]
+
+        # Convert Boolean Columns
+        obj_cols = self.us_schools_df.select_dtypes(include=["object"]).columns
+
+        bool_cols = []
+        for col in obj_cols:
+            unique_values = self.us_schools_df[col].dropna().unique()
+            # Check if the unique values are a subset of {'Yes', 'No'}
+            if set(unique_values).issubset({"Yes", "No", "Not reported", "Not applicable"}):
+                bool_cols.append(col)
+
+        # 3. Map "Yes" to True and "No" to False
+        mapping = {"Yes": "Y", "No": "N", "Not reported": "U", "Not applicable": "NA"}
+        self.us_schools_df[bool_cols] = self.us_schools_df[bool_cols].replace(mapping)
 
 
 class USSchoolsCharacteristicsData(SchoolsDataSet):
@@ -176,11 +190,11 @@ class PrivateSchoolsData(SchoolsDataSet):
 
 
 if __name__ == "__main__":
-    us_schools_characteristics = USSchoolsCharacteristicsData(
-        file_path=os.path.join("data", "us_schools.csv")
-    )
     us_schools = USSchools(
         file_path=os.path.join("data", "us_schools_detail_24_25.csv")
+    )
+    us_schools_characteristics = USSchoolsCharacteristicsData(
+        file_path=os.path.join("data", "us_schools.csv")
     )
     us_school_demographics = USSchoolDemographicsData(
         file_path=os.path.join("data", "us_schools_demographics_24_25.csv"),
@@ -191,8 +205,8 @@ if __name__ == "__main__":
 
     # Send to SQL Database
     dfs_for_sql = {
-        "Schools": us_schools_characteristics.us_schools_df,
-        "SchoolsDetails": us_schools.us_schools_df,
+        "SchoolCharacteristics": us_schools_characteristics.us_schools_df,
+        "SchoolDetails": us_schools.us_schools_df,
         "SchoolDemographics": us_school_demographics.us_school_demographics_df,
         "States": us_schools.states_df,
         "PrivateSchools": private_schools.private_schools_df,
