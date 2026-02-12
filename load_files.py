@@ -14,17 +14,107 @@ class SchoolsDataSet:
         return df
 
 
-class USSchoolsData(SchoolsDataSet):
+class USSchools(SchoolsDataSet):
+    def __init__(self, file_path):
+        super().__init__(file_path)
+        self.column_rename_map = {
+            "SCHOOL_YEAR": "SchoolYear",
+            "STATENAME": "StateName",
+            "ST": "State",
+            "SCH_NAME": "Name",
+            "LEA_NAME": "LEAName",
+            "STATE_AGENCY_NO": "StateAgencyNumber",
+            "UNION": "Union",
+            "ST_LEAID": "StateLEAID",
+            "ST_SCHID": "StateSchoolID",
+            "NCESSCH": "NCESSchoolID",
+            "SCHID": "SchoolID",
+            "MSTREET1": "MailingAddressLine1",
+            "MSTREET2": "MailingAddressLine2",
+            "MSTREET3": "MailingAddressLine3",
+            "MCITY": "MailingCity",
+            "MSTATE": "MailingState",
+            "MZIP": "MailingZip",
+            "MZIP4": "MailingZip4",
+            "LSTREET1": "PhysicalAddressLine1",
+            "LSTREET2": "PhysicalAddressLine2",
+            "LSTREET3": "PhysicalAddressLine3",
+            "LCITY": "PhysicalAddressCity",
+            "LSTATE": "PhysicalAddressState",
+            "LZIP": "PhysicaAddressZip",
+            "LZIP4": "PhysicalAddressZip4",
+            "PHONE": "Phone",
+            "WEBSITE": "Website",
+            "SY_STATUS": "SYStatus",
+            "SY_STATUS_TEXT": "SYStatusDescription",
+            "UPDATED_STATUS": "UpdatedStatus",
+            "UPDATED_STATUS_TEXT": "UpdatedStatusText",
+            "EFFECTIVE_DATE": "EffectiveDate",
+            "SCH_TYPE_TEXT": "SchoolTypeText",
+            "SCH_TYPE": "SchoolType",
+            "RECON_STATUS": "ReconStatus",
+            "OUT_OF_STATE_FLAG": "OutOfState",
+            "CHARTER_TEXT": "CharterText",
+            "CHARTAUTH1": "CharterAuthorizer1",
+            "CHARTAUTHN1": "ChartherAuthorizerN1",
+            "CHARTAUTH2": "CharterAuthorizer2",
+            "CHARTAUTHN2": "CharterAuthorizerN2",
+            "NOGRADES": "NoGrades",
+            "G_PK_OFFERED": "PK",
+            "G_KG_OFFERED": "KG",
+            "G_1_OFFERED": "01",
+            "G_2_OFFERED": "02",
+            "G_3_OFFERED": "03",
+            "G_4_OFFERED": "04",
+            "G_5_OFFERED": "05",
+            "G_6_OFFERED": "06",
+            "G_7_OFFERED": "07",
+            "G_8_OFFERED": "08",
+            "G_9_OFFERED": "09",
+            "G_10_OFFERED": "10",
+            "G_11_OFFERED": "11",
+            "G_12_OFFERED": "12",
+            "G_13_OFFERED": "13",
+            "G_UG_OFFERED": "Ungraded",
+            "G_AE_OFFERED": "AdultEducation",
+            "GSLO": "GradeOfferedLow",
+            "GSHI": "GradeOfferedHigh",
+            "LEVEL": "Level",
+            "IGOFFERED": "IGOffered",
+        }
+        self.us_schools_df = self.open_file()
+        self.states_df = self._create_states_df()
+        self._transform_school_details()
+
+    def _create_states_df(self) -> pd.DataFrame:
+        states_df = self.us_schools_df[["State", "StateName"]]
+        states_df.drop_duplicates(inplace=True)
+        states_df["StateName"] = states_df["StateName"].str.title()
+        states_df["StateID"] = range(1, len(states_df) + 1)
+        cols = ["StateID"] + [col for col in states_df.columns if col != "StateID"]
+        states_df = states_df[cols]
+        return states_df
+
+    def _transform_school_details(self):
+        states_map = self.states_df.set_index("State")["StateID"].to_dict()
+
+        # Add StateID to the column
+        self.us_schools_df["StateID"] = self.us_schools_df["State"].map(states_map)
+
+        # Drop unneeded columns
+        self.us_schools_df.drop(columns=["StateName", "FIPST"], inplace=True)
+
+        # Reorder Columns
+        cols_to_move = ["SchoolID", "SchoolYear"]
+        other_cols = [c for c in self.us_schools_df.columns if c not in cols_to_move]
+        self.us_schools_df = self.us_schools_df[cols_to_move + other_cols]
+
+
+class USSchoolsCharacteristicsData(SchoolsDataSet):
     def __init__(self, file_path: str):
         super().__init__(file_path)
         self.column_rename_map = {
             "SCHOOL_YEAR": "SchoolYear",
-            "ST": "State",
-            "STATENAME": "Description",
-            "SCH_NAME": "Name",
-            "ST_LEAID": "StateLEAID",
-            "ST_SCHID": "StateSchoolID",
-            "NCESSCH": "NCESSchoolID",
             "SCHID": "SchoolID",
             "SHARED_TIME": "SharedTime",
             "NSLP_STATUS": "NSLPStatus",
@@ -33,48 +123,13 @@ class USSchoolsData(SchoolsDataSet):
             "VIRTUAL_TEXT": "VirtualDescription",
         }
         self.us_schools_df = self.open_file()
-        self.states_df = self._create_states_df()
         self._transform_us_schools_data()
 
-    def _create_states_df(self) -> pd.DataFrame:
-        states_df = self.us_schools_df[["State", "Description"]]
-        states_df.drop_duplicates(inplace=True)
-        states_df["Description"] = states_df["Description"].str.title()
-        states_df["StateID"] = range(1, len(states_df) + 1)
-        cols = ["StateID"] + [col for col in states_df.columns if col != "StateID"]
-        states_df = states_df[cols]
-        return states_df
-
     def _transform_us_schools_data(self):
-        states_map = self.states_df.set_index("State")["StateID"].to_dict()
-
-        # Add StateID to the column
-        self.us_schools_df["StateID"] = self.us_schools_df["State"].map(states_map)
-
-        # Drop the extra column
-        self.us_schools_df.drop(columns="Description", inplace=True)
-
-        # Reorder Columns
-        us_schools_column_order = [
-            "SchoolID",
-            "SchoolYear",
-            "FIPST",
-            "StateID",
-            "State",
-            "Name",
-            "STATE_AGENCY_NO",
-            "UNION",
-            "StateLEAID",
-            "LEAID",
-            "StateSchoolID",
-            "NCESSchoolID",
-            "SharedTime",
-            "NSLPStatus",
-            "NSLPDescription",
-            "Virtual",
-            "VirtualDescription",
+        # Drop extra columns
+        self.us_schools_df = self.us_schools_df[
+            [v for v in self.column_rename_map.values()]
         ]
-        self.us_schools_df = self.us_schools_df[us_schools_column_order]
 
 
 class USSchoolDemographicsData(SchoolsDataSet):
@@ -116,31 +171,38 @@ class PrivateSchoolsData(SchoolsDataSet):
         self._transform_private_schools()
 
     # TODO Build out this function to transform the private schools into a useful dataframe
-    def _transform_private_schools():
+    def _transform_private_schools(self):
         pass
 
 
-us_schools = USSchoolsData(file_path=os.path.join("data", "us_schools.csv"))
-us_school_demographics = USSchoolDemographicsData(
-    file_path=os.path.join("data", "us_schools_demographics_24_25.csv"),
-)
-private_schools = PrivateSchoolsData(os.path.join("data", "private_schools_21_22.csv"))
+if __name__ == "__main__":
+    us_schools_characteristics = USSchoolsCharacteristicsData(
+        file_path=os.path.join("data", "us_schools.csv")
+    )
+    us_schools = USSchools(
+        file_path=os.path.join("data", "us_schools_detail_24_25.csv")
+    )
+    us_school_demographics = USSchoolDemographicsData(
+        file_path=os.path.join("data", "us_schools_demographics_24_25.csv"),
+    )
+    private_schools = PrivateSchoolsData(
+        os.path.join("data", "private_schools_21_22.csv")
+    )
 
-# Send to SQL Database
-dfs_for_sql = {
-    "Schools": us_schools.us_schools_df,
-    "SchoolDemographics": us_school_demographics.us_school_demographics_df,
-    "States": us_schools.states_df,
-    "PrivateSchools": private_schools.private_schools_df,
-}
+    # Send to SQL Database
+    dfs_for_sql = {
+        "Schools": us_schools_characteristics.us_schools_df,
+        "SchoolsDetails": us_schools.us_schools_df,
+        "SchoolDemographics": us_school_demographics.us_school_demographics_df,
+        "States": us_schools.states_df,
+        "PrivateSchools": private_schools.private_schools_df,
+    }
 
+    def write_to_sql(db: str, dfs_for_sql: dict[str, pd.DataFrame]) -> None:
+        connection = sqlite3.Connection(db)
 
-def write_to_sql(db: str, dfs_for_sql: dict[str, pd.DataFrame]) -> None:
-    connection = sqlite3.Connection(db)
+        # Run to_sql
+        for table, df in dfs_for_sql.items():
+            df.to_sql(table, con=connection, index=False, if_exists="replace")
 
-    # Run to_sql
-    for table, df in dfs_for_sql.items():
-        df.to_sql(table, con=connection, index=False, if_exists="replace")
-
-
-write_to_sql(db="Schools.db", dfs_for_sql=dfs_for_sql)
+    write_to_sql(db="Schools.db", dfs_for_sql=dfs_for_sql)
